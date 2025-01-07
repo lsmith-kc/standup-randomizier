@@ -1,5 +1,5 @@
 {
-  "name": "standup-randomizer",
+  "name": "standup-bot",
   "version": "1.0.0",
   "description": "Teams standup randomizer bot",
   "main": "index.js",
