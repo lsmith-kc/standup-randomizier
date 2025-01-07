@@ -2,123 +2,127 @@ const { CloudAdapter, ConfigurationBotFrameworkAuthentication, TeamsInfo } = req
 const restify = require('restify');
 const dotenv = require('dotenv');
 
-// Load environment variables from .env file
+// Load environment variables
 dotenv.config();
 
-console.log('=== BOT STARTING ===');
-console.log('App ID:', process.env.MicrosoftAppId);
-console.log('Environment variables loaded:', {
-    PORT: process.env.PORT,
-    MicrosoftAppId: process.env.MicrosoftAppId ? 'Set' : 'Not set',
-    MicrosoftAppPassword: process.env.MicrosoftAppPassword ? 'Set' : 'Not set'
-});
+// Logger utility to standardize log format and levels
+const logger = {
+    info: (message, data) => {
+        console.log(`[INFO] ${message}`, data ? data : '');
+    },
+    error: (message, error) => {
+        console.error(`[ERROR] ${message}`, error);
+    },
+    debug: (message, data) => {
+        if (process.env.DEBUG) {
+            console.log(`[DEBUG] ${message}`, data ? data : '');
+        }
+    }
+};
 
-// Create HTTP server
-const server = restify.createServer({
-    name: 'teams-bot'
-});
+// Bot configuration
+const BOT_CONFIG = {
+    name: 'Standup Randomizer',
+    port: process.env.PORT || 3978,
+    auth: {
+        MicrosoftAppId: process.env.MicrosoftAppId,
+        MicrosoftAppPassword: process.env.MicrosoftAppPassword,
+        MicrosoftAppType: "MultiTenant"
+    }
+};
 
-// Add body parser
+// Initialize bot services
+const server = restify.createServer({ name: BOT_CONFIG.name });
 server.use(restify.plugins.bodyParser());
 
-// Create the auth configuration
-const botFrameworkAuth = new ConfigurationBotFrameworkAuthentication({
-    MicrosoftAppId: process.env.MicrosoftAppId,
-    MicrosoftAppPassword: process.env.MicrosoftAppPassword,
-    MicrosoftAppType: "MultiTenant"
-});
-
-// Create adapter with the auth configuration
+const botFrameworkAuth = new ConfigurationBotFrameworkAuthentication(BOT_CONFIG.auth);
 const adapter = new CloudAdapter(botFrameworkAuth);
 
 // Error handler
 adapter.onTurnError = async (context, error) => {
-    console.error(`\n [onTurnError] unhandled error: ${error}`);
-    await context.sendActivity('Oops! Something went wrong. Please try again later.');
+    logger.error('Bot error:', error);
+    await context.sendActivity('Sorry, something went wrong. Please try again.');
 };
 
-// Main bot logic
-async function handleBotLogic(context) {
-    console.log('\n=== BOT LOGIC START ===');
-    
-    if (context.activity.type === 'message') {
-        const text = context.activity.text.replace(/<at>.*<\/at>/g, '').toLowerCase().trim();
-        console.log('Cleaned message:', text);
+class StandupBot {
+    async getParticipants(context) {
+        if (context.activity.conversation.conversationType === 'personal') {
+            return [{
+                id: context.activity.from.id,
+                name: context.activity.from.name
+            }];
+        }
         
-        if (text === 'standup') {
-            console.log('Standup command received');
+        const members = await TeamsInfo.getPagedMembers(context);
+        return members.members;
+    }
+
+    shuffleArray(array) {
+        const shuffled = [...array];
+        for (let i = shuffled.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+        }
+        return shuffled;
+    }
+
+    formatStandupOrder(participants) {
+        return "🎲 Today's standup order:\n\n" + 
+            participants.map((p, i) => `${i + 1}. ${p.name}`).join('\n');
+    }
+
+    async handleCommand(context) {
+        try {
+            const participants = await this.getParticipants(context);
             
-            // For personal chat, just use the sender
-            if (context.activity.conversation.conversationType === 'personal') {
-                console.log('Personal chat detected, using sender as participant');
-                const participant = {
-                    id: context.activity.from.id,
-                    name: context.activity.from.name
-                };
-                
-                let message = "🎲 Today's standup order:\n\n1. " + participant.name;
-                console.log('Sending message:', message);
-                await context.sendActivity(message);
+            if (!participants || participants.length === 0) {
+                await context.sendActivity("No participants found.");
                 return;
             }
 
-            try {
-                // For group chats and meetings
-                console.log('Getting conversation members...');
-                const members = await TeamsInfo.getPagedMembers(context);
-                console.log('Got members:', members);
-                
-                if (!members || members.members.length === 0) {
-                    await context.sendActivity("No participants found.");
-                    return;
-                }
-
-                const shuffledParticipants = shuffleArray(members.members);
-                let message = "🎲 Today's standup order:\n\n";
-                shuffledParticipants.forEach((participant, index) => {
-                    message += `${index + 1}. ${participant.name}\n`;
-                });
-                
-                console.log('Sending message:', message);
-                await context.sendActivity(message);
-            } catch (error) {
-                console.error('Error getting members:', error);
-                await context.sendActivity("Sorry, I couldn't get the participant list. Please try again.");
-            }
+            const shuffledParticipants = this.shuffleArray(participants);
+            const message = this.formatStandupOrder(shuffledParticipants);
+            
+            logger.debug('Sending standup order', { participantCount: participants.length });
+            await context.sendActivity(message);
+        } catch (error) {
+            logger.error('Error handling standup command:', error);
+            await context.sendActivity("Sorry, I couldn't get the participant list. Please try again.");
         }
     }
-    console.log('=== BOT LOGIC END ===');
+
+    async handleMessage(context) {
+        const text = context.activity.text.replace(/<at>.*<\/at>/g, '').toLowerCase().trim();
+        
+        if (text === 'standup') {
+            logger.info('Standup command received', {
+                conversationType: context.activity.conversation.conversationType,
+                userId: context.activity.from.id
+            });
+            await this.handleCommand(context);
+        }
+    }
 }
 
-// Handle incoming requests using restify's preferred middleware pattern
-server.post('/api/messages', async function(req, res) { // Make it async but only two params
-    console.log('Received message:', req.body);
+const bot = new StandupBot();
+
+// Message handler
+server.post('/api/messages', async (req, res) => {
     try {
         await adapter.process(req, res, async (context) => {
-            await handleBotLogic(context);
+            if (context.activity.type === 'message') {
+                await bot.handleMessage(context);
+            }
         });
     } catch (err) {
-        console.error('Error processing request:', err);
+        logger.error('Error processing request:', err);
         if (!res.headersSent) {
-            res.status(500);
-            res.end();
+            res.status(500).end();
         }
     }
 });
 
-// Fisher-Yates shuffle algorithm
-function shuffleArray(array) {
-    const shuffled = [...array];
-    for (let i = shuffled.length - 1; i > 0; i--) {
-        const j = Math.floor(Math.random() * (i + 1));
-        [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
-    }
-    return shuffled;
-}
-
 // Start server
-server.listen(process.env.port || process.env.PORT || 3978, () => {
-    console.log(`\n=== SERVER STARTED ===`);
-    console.log(`${server.name} listening to ${server.url}`);
-    console.log('Bot is ready to receive messages');
+server.listen(BOT_CONFIG.port, () => {
+    logger.info(`${BOT_CONFIG.name} listening on port ${BOT_CONFIG.port}`);
 });
