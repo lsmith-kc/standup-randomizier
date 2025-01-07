@@ -1,0 +1,59 @@
+{
+    "$schema": "https://developer.microsoft.com/en-us/json-schemas/teams/v1.14/MicrosoftTeams.schema.json",
+    "manifestVersion": "1.14",
+    "version": "1.0.0",
+    "id": "37516386-f0b4-47a7-b283-f8c33625a54d",
+    "packageName": "com.example.standupbot",
+    "developer": {
+        "name": "Luke Smith",
+        "websiteUrl": "https://github.com/lsmith-kc",
+        "privacyUrl": "https://example.com/privacy",
+        "termsOfUseUrl": "https://example.com/terms"
+    },
+    "name": {
+        "short": "Standup Randomizer",
+        "full": "Standup Meeting Randomizer Bot"
+    },
+    "description": {
+        "short": "Randomly orders participants for standup updates",
+        "full": "A simple bot that helps organize daily standups by randomly selecting the order of presenters from meeting participants."
+    },
+    "icons": {
+        "outline": "outline.png",
+        "color": "color.png"
+    },
+    "accentColor": "#FFFFFF",
+    "bots": [
+        {
+            "botId": "37516386-f0b4-47a7-b283-f8c33625a54d",
+            "scopes": [
+                "personal",
+                "team",
+                "groupchat"
+            ],
+            "supportsFiles": false,
+            "isNotificationOnly": false,
+            "commandLists": [
+                {
+                    "scopes": [
+                        "personal",
+                        "team",
+                        "groupchat"
+                    ],
+                    "commands": [
+                        {
+                            "title": "standup",
+                            "description": "Generate random presentation order"
+                        }
+                    ]
+                }
+            ]
+        }
+    ],
+    "permissions": [
+        "messageTeamMembers"
+    ],
+    "validDomains": [
+        "bitter-frogs-fly.loca.lt"
+    ]
+}

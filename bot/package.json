@@ -1,0 +1,11 @@
+{
+  "name": "standup-randomizer",
+  "version": "1.0.0",
+  "description": "Teams standup randomizer bot",
+  "main": "index.js",
+  "dependencies": {
+    "botbuilder": "^4.19.3",
+    "restify": "11.1.0",
+    "dotenv": "^16.0.3"
+  }
+}
