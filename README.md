@@ -1,9 +1,5 @@
 # README
 
-## Example .env file contents
+## Testing
 
-```text
-MicrosoftAppId=your-app-id
-MicrosoftAppPassword=your-app-password
-PORT=3978
-```
+See [./testing.md](testing.md).
