@@ -46,6 +46,8 @@ MicrosoftAppPassword=your-bot-password-here
 PORT=3978
 ```
 
+Note: add `DEBUG=true` to enable verbose logging.
+
 ## Running the Bot Locally
 
 ### 1. Start the Bot
